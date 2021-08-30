@@ -68,7 +68,7 @@ public class JiraClientITests {
 		List<JiraComment> comments = fields.getComment().getComments();
 		assertThat(comments).hasSize(4);
 		JiraComment first = comments.get(0);
-		assertThat(first.getAuthor().getKey()).isEqualTo("balex");
+		assertThat(first.getAuthor().getAccountId()).isEqualTo("balex");
 		assertThat(first.getAuthor().getDisplayName()).isEqualTo("Ben Alex");
 		assertThat(first.getBody()).isEqualTo("This is an important and useful tool to get in 0.9.0, so it can receive some exposure and testing.");
 		assertThat(first.getCreated()).isEqualTo("2005-06-26T15:39:42.000+0000");
@@ -81,10 +81,10 @@ public class JiraClientITests {
 		assertThat(fields.getResolution().getName()).isEqualTo("Fixed");
 
 		JiraUser reporter = fields.getReporter();
-		assertThat(reporter.getKey()).isEqualTo("balex");
+		assertThat(reporter.getAccountId()).isEqualTo("balex");
 		assertThat(reporter.getDisplayName()).isEqualTo("Ben Alex");
 		JiraUser assignee = fields.getAssignee();
-		assertThat(assignee.getKey()).isEqualTo("luke");
+		assertThat(assignee.getAccountId()).isEqualTo("luke");
 		assertThat(assignee.getDisplayName()).isEqualTo("Luke Taylor");
 	}
 

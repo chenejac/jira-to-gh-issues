@@ -15,38 +15,15 @@
  */
 package io.pivotal.jira;
 
-import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.stereotype.Component;
-
 import lombok.Data;
 
 /**
  * @author Rob Winch
  *
  */
-@Component
-@ConfigurationProperties(prefix="jira")
 @Data
-public class JiraConfig {
-	/**
-	 * The base url of JIRA to use. For example, "https://jira.spring.io"
-	 */
-	String baseUrl;
-
-	/**
-	 * The JIRA project id to migrate. For example, "SEC".
-	 */
-	String projectId;
-
-	/**
-	 * (Optional) the JQL used to query which issues should be migrated. This
-	 * defaults to all the issues for the projectId.
-	 */
-	String migrateJql;
-
-	String userProfilePage;
-
-	public String getMigrateJql() {
-		return migrateJql == null ? "project = " + getProjectId() + " ORDER BY key ASC" : migrateJql;
-	}
+public class JiraPriority {
+	String id;
+    String name;
+    String statusColor;
 }

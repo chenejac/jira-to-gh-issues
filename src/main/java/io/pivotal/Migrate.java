@@ -70,6 +70,7 @@ public class Migrate implements CommandLineRunner {
 		System.out.println("Creating Labels");
 		github.createComponentLabels(project.getComponents());
 		github.createIssueTypeLabels(project.getIssueTypes());
+		github.createPrioritiesLabels(jira.findPriorities());
 
 		System.out.println("Getting JIRA issues");
 		List<JiraIssue> issues = jira.findIssues(jiraConfig.getMigrateJql());

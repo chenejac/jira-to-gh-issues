@@ -16,19 +16,15 @@
 package io.pivotal.github;
 
 import java.io.IOException;
+import java.lang.reflect.Type;
 import java.net.HttpURLConnection;
 import java.net.URI;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import io.pivotal.jira.*;
 import org.eclipse.egit.github.core.IRepositoryIdProvider;
 import org.eclipse.egit.github.core.Label;
 import org.eclipse.egit.github.core.Milestone;
@@ -62,18 +58,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-import io.pivotal.jira.IssueLink;
-import io.pivotal.jira.JiraComment;
-import io.pivotal.jira.JiraComponent;
-import io.pivotal.jira.JiraConfig;
-import io.pivotal.jira.JiraFixVersion;
-import io.pivotal.jira.JiraIssue;
 import io.pivotal.jira.JiraIssue.Fields;
-import io.pivotal.jira.JiraIssueType;
-import io.pivotal.jira.JiraResolution;
-import io.pivotal.jira.JiraStatus;
-import io.pivotal.jira.JiraUser;
-import io.pivotal.jira.JiraVersion;
 import io.pivotal.util.MarkupEngine;
 import io.pivotal.util.MarkupManager;
 import lombok.Data;
@@ -220,7 +205,7 @@ public class GithubClient {
 		for (JiraComponent component : components) {
 			Label label = new Label();
 			label.setColor("000000");
-			label.setName(component.getName());
+			label.setName(component.getName().replace(",", ";"));
 			labels.createLabel(createRepositoryId(), label);
 		}
 	}
@@ -236,6 +221,21 @@ public class GithubClient {
 			Label label = new Label();
 			label.setColor("eeeeee");
 			label.setName(issueType.getName());
+			labels.createLabel(createRepositoryId(), label);
+		}
+	}
+
+	public void createPrioritiesLabels(List<JiraPriority> priorities) throws IOException{
+		LabelService labels = new LabelService(client());
+		Set<String> existingLabels = labels.getLabels(createRepositoryId()).stream().map(l -> l.getName().toLowerCase())
+				.collect(Collectors.toSet());
+		for (JiraPriority priority : priorities) {
+			if (existingLabels.contains(priority.getName().toLowerCase())) {
+				continue;
+			}
+			Label label = new Label();
+			label.setColor(priority.getStatusColor());
+			label.setName(priority.getName());
 			labels.createLabel(createRepositoryId(), label);
 		}
 	}
@@ -293,7 +293,7 @@ public class GithubClient {
 
 	}
 
-	private void createBackports(Map<String, Milestone> nameToMilestone, ImportedIssue importedIssue) throws InterruptedException {
+	private void createBackports(Map<String, Milestone> nameToMilestone, ImportedIssue importedIssue) throws InterruptedException, IOException {
 		String url = getImportedIssueReference(importedIssue);
 		JiraIssue jiraIssue = importedIssue.getJiraIssue();
 		for(JiraFixVersion version : importedIssue.getBackportVersions()) {
@@ -345,7 +345,7 @@ public class GithubClient {
 		}
 	}
 
-	private ImportedIssue importIssue(Map<String, Milestone> nameToMilestone, JiraIssue issue) {
+	private ImportedIssue importIssue(Map<String, Milestone> nameToMilestone, JiraIssue issue) throws IOException {
 		List<JiraFixVersion> fixVersions = JiraFixVersion.sort(issue.getFields().getFixVersions());
 		JiraFixVersion fixVersion = fixVersions.isEmpty() ? null : fixVersions.get(0);
 
@@ -358,6 +358,7 @@ public class GithubClient {
 		return new ImportedIssue(issue, importResponse, versionsToBackport);
 
 	}
+//	private ImportGithubIssue wrong = null;
 
 	private ResponseEntity<ImportGithubIssueResponse> importIssue(ImportGithubIssue importIssue) {
 		URI uri = UriComponentsBuilder
@@ -369,12 +370,23 @@ public class GithubClient {
 				.accept(new MediaType("application", "vnd.github.golden-comet-preview+json"))
 				.header("Authorization", "token " + getAccessToken());
 
+/*if(wrong == null){
+	wrong = importIssue;
+} else {
+System.out.println(wrong.getIssue().getAssignee());
+System.out.println(importIssue.getIssue().getAssignee());
+	importIssue.getIssue().setAssignee("chenejac");
+}*/
+		if(importIssue.getIssue().getAssignee() != null){
+			importIssue.getIssue().setAssignee("chenejac");
+		}
+
 		ResponseEntity<ImportGithubIssueResponse> result = rest.exchange(request.body(importIssue), ImportGithubIssueResponse.class);
 		result.getBody().setImportIssue(importIssue);
 		return result;
 	}
 
-	private ImportGithubIssue createImportIssue(Map<String, Milestone> nameToMilestone, JiraIssue issue, JiraFixVersion version) {
+	private ImportGithubIssue createImportIssue(Map<String, Milestone> nameToMilestone, JiraIssue issue, JiraFixVersion version) throws IOException {
 		ImportGithubIssue importIssue = new ImportGithubIssue();
 
 		GithubIssue ghIssue = createGithubIssue(nameToMilestone, issue, version);
@@ -386,9 +398,9 @@ public class GithubClient {
 		return importIssue;
 	}
 
-	private GithubIssue createGithubIssue(Map<String, Milestone> nameToMilestone, JiraIssue issue, JiraFixVersion fixVersion) {
+	private GithubIssue createGithubIssue(Map<String, Milestone> nameToMilestone, JiraIssue issue, JiraFixVersion fixVersion) throws IOException {
 		Fields fields = issue.getFields();
-		boolean closed = fields.getResolution() != null;
+		boolean closed = fields.getStatus().getName().equals("Closed");
 		DateTime updated = fields.getUpdated();
 		GithubIssue ghIssue = new GithubIssue();
 		ghIssue.setTitle(issue.getKey() + ": " + fields.getSummary());
@@ -398,8 +410,19 @@ public class GithubClient {
 		String migrated = "Migrated from " + engine.link(issue.getKey(), migratedLink);
 		String body;
 		if(fields.getDescription() != null) {
-			body = engine.link(fields.getReporter().getDisplayName(), fields.getReporter().getBrowserUrl()) + " ("+ migrated +")" + " said:\n\n";
-			body += engine.convert(fields.getDescription());
+			String ghUsername = jiraUsernameToGithubUsername.get(fields.getReporter().getAccountId());
+			if (ghUsername != null) {
+				body = engine.link(fields.getReporter().getDisplayName(), "https://github.com/"+ghUsername) + " (" + migrated + ")" + " said:\n\n";
+			}
+			else {
+				body = engine.link(fields.getReporter().getDisplayName(), fields.getReporter().getBrowserUrl(jiraConfig.getBaseUrl() + jiraConfig.getUserProfilePage())) + " (" + migrated + ")" + " said:\n\n";
+			}
+			String description = fields.getDescription();
+			for (JiraAttachment att:fields.getAttachment()
+				 ) {
+				description = description.replace("!"+att.getFilename()+"!", "![](" + att.getContent() + "?raw=true)");
+			}
+			body += engine.convert(description);
 		} else {
 			body = migrated;
 		}
@@ -410,7 +433,7 @@ public class GithubClient {
 		}
 		JiraUser assignee = issue.getFields().getAssignee();
 		if (assignee != null) {
-			String ghUsername = jiraUsernameToGithubUsername.get(assignee.getKey());
+			String ghUsername = jiraUsernameToGithubUsername.get(assignee.getAccountId());
 			if (ghUsername != null) {
 				ghIssue.setAssignee(ghUsername);
 			}
@@ -426,28 +449,92 @@ public class GithubClient {
 			ghIssue.setMilestone(m.getNumber());
 		}
 
+		LabelService labels = new LabelService(client());
+		Set<String> existingLabels = labels.getLabels(createRepositoryId()).stream().map(l -> l.getName())
+				.collect(Collectors.toSet());
+
 		List<String> componentNames = fields.getComponents().stream()
 			.map(JiraComponent::getName)
 			.collect(Collectors.toList());
-		ghIssue.getLabels().addAll(componentNames);
+		for (String componentName:componentNames
+			 ) {
+			addLabelToGithubIssue(ghIssue, componentName);
+		}
 
 		JiraStatus status = fields.getStatus();
 		if(status != null) {
-			ghIssue.getLabels().add(status.getName());
+			addLabelToGithubIssue(ghIssue, status.getName());
 		}
 
 		JiraIssueType issueType = fields.getIssuetype();
 		if(issueType != null) {
-			ghIssue.getLabels().add(issueType.getName());
+			addLabelToGithubIssue(ghIssue, issueType.getName());
 		}
 
 		JiraResolution jiraResolution = fields.getResolution();
 		if(jiraResolution != null) {
-			ghIssue.getLabels().add(jiraResolution.getName());
+			addLabelToGithubIssue(ghIssue, jiraResolution.getName());
 		}
-		ghIssue.getLabels().add("Jira");
+
+		JiraPriority priority = fields.getPriority();
+		if(priority != null) {
+			addLabelToGithubIssue(ghIssue, priority.getName());
+		}
+
+		for (String lab:fields.getLabels()
+			 ) {
+			try{
+				addLabelToGithubIssue(ghIssue, lab);
+			} catch (Exception e){
+
+			}
+		}
+
+		addLabelToGithubIssue(ghIssue, "Jira");
 
 		return ghIssue;
+	}
+
+	private void addLabelToGithubIssue(GithubIssue ghIssue, String labelString) throws IOException {
+		LabelService labels = new LabelService(client());
+		try{
+			Set<String> existingLabels = labels.getLabels(createRepositoryId()).stream().map(l -> l.getName())
+				.collect(Collectors.toSet());
+
+
+			if(labelString != null) {
+				labelString = labelString.replace(",", ";");
+				if (existingLabels.contains(labelString)) {
+					ghIssue.getLabels().add(labelString);
+				} else if (existingLabels.contains(labelString.toLowerCase())) {
+					ghIssue.getLabels().add(labelString.toLowerCase());
+				} else {
+					Label label = new Label();
+					label.setColor("ffffff");
+					label.setName(labelString);
+					try {
+						labels.createLabel(createRepositoryId(), label);
+					} catch (Exception e) {
+						e.printStackTrace();
+					}
+					ghIssue.getLabels().add(labelString);
+				}
+			}
+		} catch (RequestException ex){
+			if(ex.getMessage().startsWith("API rate limit exceeded")){
+				long sleep = 3600000;
+				long endTime = System.currentTimeMillis() + sleep;
+				System.out.println("Sleeping until "+ new DateTime(endTime));
+				for(long now = System.currentTimeMillis(); now < endTime; now = System.currentTimeMillis()) {
+					try {
+						Thread.sleep(sleep);
+					} catch (InterruptedException e1) {
+					}
+				}
+				System.out.println("Continuing");
+				addLabelToGithubIssue(ghIssue, labelString);
+			}
+		}
 	}
 
 	private List<GithubComment> createComments(JiraIssue issue) {
@@ -456,8 +543,14 @@ public class GithubClient {
 		for (JiraComment jiraComment : fields.getComment().getComments()) {
 			GithubComment comment = new GithubComment();
 			MarkupEngine engine = markup.engine(jiraComment.getCreated());
-
-			String userUrl = jiraComment.getAuthor().getBrowserUrl();
+			String ghUsername = jiraUsernameToGithubUsername.get(jiraComment.getAuthor().getAccountId());
+			String userUrl = null;
+			if (ghUsername != null) {
+				userUrl = "https://github.com/"+ghUsername;
+			}
+			else {
+				userUrl = jiraComment.getAuthor().getBrowserUrl(jiraConfig.getBaseUrl() + jiraConfig.getUserProfilePage());
+			}
 			String body = engine.link(jiraComment.getAuthor().getDisplayName(), userUrl) + " said:\n\n";
 			body += engine.convert(jiraComment.getBody());
 			comment.setBody(body);
@@ -488,6 +581,30 @@ public class GithubClient {
 				HttpURLConnection result = super.configureRequest(request);
 				result.setRequestProperty(HEADER_ACCEPT, MediaType.APPLICATION_JSON_VALUE);
 				return result;
+			}
+
+			@Override
+			public <V> V post(String uri, Object params, Type type) throws IOException {
+				HttpURLConnection request = this.createPost(uri);
+				return this.sendJson2(request, params, type);
+			}
+
+			private <V> V sendJson2(HttpURLConnection request, Object params, Type type) throws IOException {
+				if(params instanceof Milestone)
+					this.sendParams(request, new SimpleMilestone((Milestone) params));
+				else
+					this.sendParams(request, params);
+				int code = request.getResponseCode();
+				System.out.println(this.toJson(params));
+
+				this.updateRateLimits(request);
+				if (this.isOk(code)) {
+					return type != null ? this.parseJson(this.getStream(request), type) : null;
+				} else if (this.isEmpty(code)) {
+					return null;
+				} else {
+					throw this.createException(this.getStream(request), code, request.getResponseMessage());
+				}
 			}
 
 		};

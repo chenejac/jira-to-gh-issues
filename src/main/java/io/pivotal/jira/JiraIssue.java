@@ -61,5 +61,8 @@ public class JiraIssue {
 		JiraUser reporter;
 		JiraUser assignee;
 		List<IssueLink> issuelinks;
+		JiraPriority priority;
+		List<String> labels;
+		List<JiraAttachment> attachment;
 	}
 }

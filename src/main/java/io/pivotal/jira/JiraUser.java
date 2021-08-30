@@ -27,10 +27,10 @@ import lombok.Data;
 public class JiraUser {
 
 	String displayName;
-	String key;
+	String accountId;
 	String self;
 
-	public String getBrowserUrl() {
-		return UriComponentsBuilder.fromHttpUrl(self).replacePath("/secure/ViewProfile.jspa").replaceQuery("").queryParam("name",key).toUriString();
+	public String getBrowserUrl(String prefix) {
+		return UriComponentsBuilder.fromHttpUrl(prefix+"/"+accountId).toUriString();
 	}
 }

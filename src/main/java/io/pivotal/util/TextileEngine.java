@@ -51,7 +51,7 @@ public class TextileEngine implements MarkupEngine {
 		text = blockCode(text);
 		text = text.replaceAll("\\[(.+?)\\|(http.*?)\\]","[\"$1\":$2]");
 		text = text.replaceAll("\\{\\{(.+?)\\}\\}", "@$1@");
-		return text.replaceAll("\\[~([\\w]+)\\]", "[\"$1\":" + jiraBaseUrl + "/secure/ViewProfile.jspa?name=$1]");
+		return text.replaceAll("\\[~([\\w]+)\\]", "[\"$1\":" + jiraBaseUrl + "/jira/people/$1]");
 	}
 
 	public static String blockCode(String str) {

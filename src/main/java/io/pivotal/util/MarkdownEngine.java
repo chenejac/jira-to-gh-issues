@@ -46,6 +46,7 @@ public class MarkdownEngine implements MarkupEngine {
 		if(!StringUtils.hasLength(text)) {
 			return "";
 		}
+		text = text.replace("# ", "* ");
 		text = header(text);
 		text = text.replaceAll("\\{(code|noformat)(:(\\w+))?(?:(:|\\|)\\w+=.+?)*\\}","```$3 ");
 		text = text.replaceAll("(```\\w*) (.+)", "$1\n$2");
@@ -53,7 +54,7 @@ public class MarkdownEngine implements MarkupEngine {
 		text = text.replaceAll("\\[(.+?)\\|(http.*?)\\]","[$1]($2)");
 		text = text.replaceAll("\\{\\{(.+?)\\}\\}","`$1`");
 		text = quote(text);
-		return text.replaceAll("\\[~([\\w]+)\\]", "[$1](" + jiraBaseUrl + "/secure/ViewProfile.jspa?name=$1)");
+		return text.replaceAll("\\[~([\\w]+)\\]", "[$1](" + jiraBaseUrl + "/jira/people/$1)");
 	}
 
 	public String header(String text) {
